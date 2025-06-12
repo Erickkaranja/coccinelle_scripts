@@ -1,32 +1,78 @@
-// Pattern: Find mutex_lock/unlock blocks with goto, break, or return
-//refine futher to only catch related locks.
-//check where unlock are confined in conditions.
+// Pattern: Find mutex_lock/unlock blocks with goto.
+
+//where unlock is done within a goto label
 @r1@
-identifier goto_label;
-position goto_pos;
-identifier lock =~ ".*_lock$";
-identifier unlock =~ ".*_unlock$";
+identifier label;
+expression E;
+position p;
 
 @@
 
-*lock(...);
+mutex_lock(E);
+... when != mutex_unlock(E);
+goto label;
+...
+label:
+mutex_unlock@p(E);
+return ...;
 
-... when any
-
-goto goto_label@goto_pos;
-
-... when any
-*unlock(...);
+@r2@
+identifier label;
+expression E;
+position p;
 
 @@
-identifier lock =~ ".*_lock$";
-identifier unlock =~ ".*_unlock$";
+
+mutex_lock(E);
+... when != mutex_unlock(E);
+goto label;
+...
+*label:
+mutex_unlock@p(E);
+...
+return ...;
+
+//multiple goto statements
+
+@r3@
+expression E;
+identifier L1, L2; 
+statement S1, S2; 
 @@
-*lock(...);
 
-... when any 
+*mutex_lock(E);
+... when != mutex_unlock(E)
+(
+  goto L1;
+  ... 
+  goto L2; 
+)
+... 
 
-*return ...;
+(
+  L1: 
+  ... when any 
+  mutex_unlock(E);
+|
+  L2: 
+  ... when any 
+  mutex_unlock(E);
+)
 
-... when any 
-*unlock(...);
+// identify if a mutex_unlock occurs at function end 
+// In this scenario guard(...) (...); is preferred
+
+//@badr1@
+//identifier I;
+//position p;
+
+//@@
+
+//I(...) {
+//  mutex_lock(...);
+//  ... 
+//  *mutex_unlock@p(...);
+//}
+
+//@depends on !badr1@
+
