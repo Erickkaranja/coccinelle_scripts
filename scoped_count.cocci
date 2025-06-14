@@ -5,7 +5,7 @@ c,c1, c2, c3, c4 = 0, 0, 0, 0, 0
 @r0 exists@
 position p;
 @@
-*scoped_guard@p(...) {
+scoped_guard@p(...) {
 ...
 return ...;
 ...
@@ -15,6 +15,7 @@ return ...;
 p << r0.p;
 @@
 c +=1
+print(f'{p[0].file}')
 
 @r1 exists@
 position p != r0.p;
@@ -30,6 +31,8 @@ break;
 p << r1.p;
 @@
 c1 += 1
+print(f'{p[0].file}')
+
 
 @ r2 exists@
 identifier id_goto;
@@ -45,6 +48,8 @@ goto id_goto;
 p << r2.p;
 @@
 c2 += 1
+print(f'{p[0].file}')
+
 
 @r3 exists@
 expression E;
@@ -56,6 +61,8 @@ scoped_guard@p(...) E;
 p << r3.p;
 @@
 c3 += 1
+print(f'{p[0].file}')
+
 
 @r4 exists@
 statement s;
@@ -68,6 +75,8 @@ s
 p << r4.p;
 @@
 c4 += 1
+print(f'{p[0].file}')
+
 
 @finalize:python@
 @@
