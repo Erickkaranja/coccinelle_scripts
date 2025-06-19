@@ -1,6 +1,6 @@
 @initialize:python@
 @@
-c,c1, c2, c3, c4 = 0, 0, 0, 0, 0
+c,c1, c2, c3 = 0, 0, 0, 0
 
 @r0 exists@
 position p;
@@ -15,7 +15,6 @@ return ...;
 p << r0.p;
 @@
 c +=1
-print(f'{p[0].file}')
 
 @r1 exists@
 position p != r0.p;
@@ -31,7 +30,6 @@ break;
 p << r1.p;
 @@
 c1 += 1
-print(f'{p[0].file}')
 
 
 @ r2 exists@
@@ -48,35 +46,18 @@ goto id_goto;
 p << r2.p;
 @@
 c2 += 1
-print(f'{p[0].file}')
 
 
 @r3 exists@
-expression E;
+statement s;
 position p != {r0.p, r1.p, r2.p};
 @@
-scoped_guard@p(...) E;
+scoped_guard@p(...) {s};
 
 @script:python@
 p << r3.p;
 @@
 c3 += 1
-print(f'{p[0].file}')
-
-
-@r4 exists@
-statement s;
-position p != {r0.p, r1.p, r2.p, r3.p};
-@@
-scoped_guard@p(...){
-s
-}
-@script:python@
-p << r4.p;
-@@
-c4 += 1
-print(f'{p[0].file}')
-
 
 @finalize:python@
 @@
@@ -84,6 +65,5 @@ print('=' * 50)
 print(f'scoped_guard with return  statement : {c}')
 print(f'scoped_guard total with break statement : {c1}')
 print(f'scoped_guard with goto label : {c2}')
-print(f'Unguarded scoped_guard  : {c3}')
-print(f'Guarded scoped_guard with no return, goto or break statements : {c4}')
+print(f'Guarded scoped_guard with no return, goto or break statements : {c3}')
 print('=' * 50)

@@ -7,7 +7,7 @@ count = 0
 @r0 exists@
 position p;
 @@
-*scoped_guard@p(...) {
+scoped_guard@p(...) {
   <+...
    return ...;
  ...+>
@@ -48,27 +48,16 @@ p << r2.p;
 count += 1
 
 @r3 exists@
-expression E;
+statement s;
 position p != {r0.p, r1.p, r2.p};
 @@
-scoped_guard@p(...) E;
+*scoped_guard@p(...) {s};
 
 @script:python@
 p << r3.p;
 @@
 count += 1
 
-@r4 exists@
-statement s;
-position p != {r0.p, r1.p, r2.p, r3.p};
-@@
-scoped_guard@p(...){
-s
-}
-@script:python@
-p << r4.p;
-@@
-count += 1
 
 @finalize:python@
 @@
