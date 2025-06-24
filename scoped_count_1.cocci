@@ -37,7 +37,7 @@ count += 1
 identifier id_goto;
 position p != {r0.p, r1.p};
 @@
-scoped_guard@p(...) {
+*scoped_guard@p(...) {
   ... 
   goto id_goto;
   ... 
