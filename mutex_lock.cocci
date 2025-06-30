@@ -2,6 +2,7 @@
 expression E;
 @@
 mutex_lock(E);
+
 @badr1@
 expression r1.E;
 position p;
