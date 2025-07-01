@@ -75,16 +75,11 @@ position cond.lp;
 @@
 mutex_lock@lp(E);
  ... when != mutex_unlock(E);
-(
-if (...)
-   goto label;
-|
 if (...) {
-  <+...
+    ...
     goto label;
-  ...+>
-}
-)
+  }
+
 @r5 depends on badr4@
 position cond.lp, r2.p;
 expression r1.E;
@@ -100,7 +95,6 @@ mutex_lock@s_g@lp(E);
 @r3@
 expression r1.E;
 position r2.p, cond.lp, r5.s_g;
-identifier label;
 
 @@
 (
