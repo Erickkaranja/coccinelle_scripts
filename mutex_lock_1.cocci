@@ -68,11 +68,63 @@ mutex_lock@lp(E);
  ...
 mutex_unlock@up@p(E);
 
-@r3@
+@badr4 exists@
+identifier label;
 expression r1.E;
-position r2.p, cond.lp;
+position cond.lp;
+@@
+mutex_lock@lp(E);
+ ... when != mutex_unlock(E);
+(
+if (...)
+   goto label;
+|
+if (...) {
+  <+...
+    goto label;
+  ...+>
+}
+)
+@r5 depends on badr4@
+position cond.lp, r2.p;
+expression r1.E;
+position s_g;
 
 @@
+mutex_lock@s_g@lp(E);
+  ...
+   mutex_unlock@p(E);
+  return ...;
+
+
+@r3@
+expression r1.E;
+position r2.p, cond.lp, r5.s_g;
+identifier label;
+
+@@
+(
+- mutex_lock@s_g(E);
++ scoped_guard(E) {
+<...
+(
+ if(...)
+-  {   
+-  mutex_unlock(E); 
+   return ...; 
+-  }
+|
+ if(...) { ... 
+-  mutex_unlock(E); 
+   ... 
+   return ...; }
+)
+ ...>
+-mutex_unlock@p(E);
++}
+return ...;
+
+|
 
 - mutex_lock@lp(E);
 + guard(mutex)(E);
@@ -92,8 +144,7 @@ position r2.p, cond.lp;
  ...>
 -mutex_unlock@p(E);
 return ...;
-
-
+)
 
 //----------------------------------
 @cond_2@
@@ -126,7 +177,7 @@ mutex_lock@lp(E);
  ... 
 mutex_unlock@up@p(E);
 
-@r5@
+@r7@
 expression r1.E;
 position r4.p, cond_2.lp;
 identifier label;
@@ -152,26 +203,34 @@ identifier label;
 |
 
    if(...)
+-   {   
+-    mutex_unlock(E);
+     continue;
+-   }
+
+|
+  if(...)
+    {
+     ...
+-    mutex_unlock(E);
+     continue;
+    }
+
+|
+
+  if(...)
+-   {
+-    mutex_unlock(E);
+     goto label;
+-   }
+|
+
+  if(...)
     {
      ...
 -    mutex_unlock(E);
      goto label;
-   }
-|
-
-   if(...)
--    {
--    mutex_unlock(E);
-     goto label;
--   }
-
-|
-
-   if(...)
--    {   
--    mutex_unlock(E);
-     continue;
--   }
+    }
 )   
   ...>
 -mutex_unlock@p(E);
