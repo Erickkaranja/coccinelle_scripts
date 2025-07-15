@@ -1,0 +1,578 @@
+init_defs_builtins: /usr/local/lib/coccinelle/standard.h
+-----------------------------------------------------------------------
+processing semantic patch file: /home/dev-karanja/coccinelle_scripts/mutex_lock.cocci
+with isos from: /usr/local/lib/coccinelle/standard.iso
+-----------------------------------------------------------------------
+//safe handling scoped_guard transformation.
+//replace calls to mutex_lock and mutex_unlock
+//with scoped_guard.
+@r exists@
+expression E;
+iterator I;
+position p;
+@@
+(
+I(...){
+  <...
+  mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+    {
+       ...
+       mutex_unlock(E);
+       ... when any
+       break;
+    }
+|
+
+break;
+)
+   ...>
+}
+
+ 
+|
+for(...; ...; ...){
+   <...
+   mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+     {
+       ...
+       mutex_unlock(E);
+       ... when any
+       break;
+     }
+|
+break;
+)
+   ...>
+}
+|
+while(...) {
+ <...
+ mutex_lock@p(E);
+ ... when != mutex_unlock(E);
+     when any
+(
+    {
+     ...
+     mutex_unlock(E);
+     ... when any
+     break;
+    }
+|
+break;
+)
+ ...>
+}
+)
+
+@r1@
+expression E;
+@@
+mutex_lock(E);
+
+@@
+expression r1.E, E1;
+@@
+-mutex_lock(E);
++scoped_guard(E)
+E1;
+-mutex_unlock(E);
+
+@goto_unlock exists@
+expression E;
+identifier label;
+position p;
+position p1;
+statement s;
+@@
+mutex_lock@p1(E);
+... when != mutex_unlock(E);
+    goto label;
+...
+label:
+(
+    mutex_unlock(E);
+|
+    s@p
+)
+
+@badr4 exists@
+expression E;
+position goto_unlock.p;
+position goto_unlock.p1;
+position p2;
+statement s;
+@@
+mutex_lock@p1@p2(E);
+...
+s@p
+
+@cond@
+expression r1.E;
+position lp != {r.p ,badr4.p2};
+position up;
+@@
+mutex_lock@lp(E);
+... when strict
+mutex_unlock@up(E);
+
+@script:python@
+up << cond.up;
+lp << cond.lp;
+
+@@
+
+for i in range(len(up)):
+    if int(lp[0].line) > int(up[i].line):
+        cocci.include_match(False)
+        break
+
+//------------------------------------
+@badr1@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... return ...; }
+
+@badr2@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ...  continue; }
+
+@badr3@
+expression r1.E;
+position p;
+identifier label;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... goto label; }
+
+@r2@
+expression r1.E;
+position p != {badr1.p, badr2.p, badr3.p};
+position cond.lp, cond.up;
+
+@@
+
+mutex_lock@lp(E);
+ ...
+mutex_unlock@up@p(E);
+
+@script:python@
+p << r2.p;
+lp << cond.lp;
+@@
+if len(p) > 1:
+   cocci.include_match(False)
+
+@badr5 exists@
+identifier label;
+expression r1.E;
+position cond.lp;
+@@
+mutex_lock@lp(E);
+ ... when != mutex_unlock(E);
+if (...) {
+    ...
+    goto label;
+  }
+
+@r5 depends on badr5@
+position cond.lp, r2.p;
+expression r1.E;
+position s_g != badr4.p2;
+
+@@
+mutex_lock@s_g@lp(E);
+  ...
+   mutex_unlock@p(E);
+  return ...;
+
+
+@r3@
+expression r1.E;
+position r2.p, cond.lp, r5.s_g;
+
+@@
+(
+- mutex_lock@s_g(E);
++ scoped_guard(E) {
+<...
+(
+ if(...)
+-  {   
+-  mutex_unlock(E); 
+   return ...; 
+-  }
+|
+ if(...) { ... 
+-  mutex_unlock(E);
+   return ...; }
+)
+ ...>
+-mutex_unlock@p(E);
++}
+return ...;
+
+|
+
+- mutex_lock@lp(E);
++ guard(mutex)(E);
+<...
+(
+ if(...)
+-  { 
+-  mutex_unlock(E); 
+   return ...; 
+-  }
+|
+ if(...) { ... 
+-  mutex_unlock(E);
+   return ...; }
+)
+ ...>
+-mutex_unlock@p(E);
+return ...;
+)
+
+//----------------------------------
+@cond_2@
+expression r1.E;
+position lp != badr4.p2, up; 
+@@
+mutex_lock@lp(E);
+... when strict
+mutex_unlock@up(E);
+
+@script:python@
+up << cond_2.up;
+lp << cond_2.lp;
+
+@@
+
+for i in range(len(up)):
+    if int(lp[0].line) > int(up[i].line):
+        cocci.include_match(False)
+        break
+
+@badr2_1@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... return ...; }
+
+@badr2_2@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ...  continue; }
+
+@badr2_3@
+expression r1.E;
+position p;
+identifier label;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... goto label; }
+
+
+@r4@
+expression r1.E;
+position p != {badr2_1.p, badr2_2.p, badr2_3.p};
+position cond_2.lp, cond_2.up;
+
+@@
+
+mutex_lock@lp(E);
+ ... 
+mutex_unlock@up@p(E);
+
+@r7@
+expression r1.E;
+position r4.p, cond_2.lp;
+identifier label;
+
+@@
++scoped_guard(E) {
+-mutex_lock@lp(E);
+<...
+(
+   if(...)
+-   {   
+-    mutex_unlock(E); 
+     return ...; 
+-  }
+
+|
+
+   if(...) { ... 
+-    mutex_unlock(E); 
+     return ...; 
+  }
+
+|
+
+   if(...)
+-   {   
+-    mutex_unlock(E);
+     continue;
+-   }
+
+|
+  if(...)
+    {
+     ...
+-    mutex_unlock(E);
+     continue;
+    }
+
+|
+
+  if(...)
+-   {
+-    mutex_unlock(E);
+     goto label;
+-   }
+|
+
+  if(...)
+    {
+     ...
+-    mutex_unlock(E);
+     goto label;
+    }
+)   
+  ...>
+-mutex_unlock@p(E);
++}
+
+-----------------------------------------------------------------------
+script  = 
+-----------------------------------------------------------------------
+dependencies for script satisfied:
+binding in = []
+Initializing python
+%!
+HANDLING: test_2.c
+-----------------------------------------------------------------------
+let's go
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+r = 
+-----------------------------------------------------------------------
+dependencies for rule r satisfied:
+binding in = []
+binding relevant in = []
+     transformation info is empty
+     binding out = [r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))]]
+-----------------------------------------------------------------------
+r1 = 
+-----------------------------------------------------------------------
+dependencies for rule r1 satisfied:
+binding in = [r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))]]
+binding relevant in = []
+     transformation info is empty
+     binding out = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+rule starting on line 73 = 
+-----------------------------------------------------------------------
+dependencies for rule rule starting on line 73 satisfied:
+binding in = [r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+goto_unlock = 
+-----------------------------------------------------------------------
+dependencies for rule goto_unlock satisfied:
+binding in = [r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             r1.E --> &node->mutex]
+binding relevant in = []
+-----------------------------------------------------------------------
+badr4 = 
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+cond = 
+-----------------------------------------------------------------------
+dependencies for rule cond satisfied:
+binding in = [r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             r1.E --> &node->mutex]
+binding relevant in = [badr4.p2 --> poss[];
+                      r.p --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                      r1.E --> &node->mutex]
+RESULT =
+-----------------------------------------------------------------------
+script rule starting on line 119 = 
+-----------------------------------------------------------------------
+script not applied: cond.up, cond.lp not bound
+-----------------------------------------------------------------------
+badr1 = 
+-----------------------------------------------------------------------
+dependencies for rule badr1 satisfied:
+binding in = [r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+badr2 = 
+-----------------------------------------------------------------------
+dependencies for rule badr2 satisfied:
+binding in = [r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+badr3 = 
+-----------------------------------------------------------------------
+dependencies for rule badr3 satisfied:
+binding in = [r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+r2 = 
+-----------------------------------------------------------------------
+RESULT =
+-----------------------------------------------------------------------
+script rule starting on line 164 = 
+-----------------------------------------------------------------------
+script not applied: r2.p, cond.lp not bound
+-----------------------------------------------------------------------
+badr5 = 
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+r5 = 
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+r3 = 
+-----------------------------------------------------------------------
+-----------------------------------------------------------------------
+cond_2 = 
+-----------------------------------------------------------------------
+dependencies for rule cond_2 satisfied:
+binding in = [r1.E --> &node->mutex]
+binding relevant in = [badr4.p2 --> poss[];r1.E --> &node->mutex]
+     transformation info is empty
+     binding out = [cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+                   cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))]]
+RESULT =
+-----------------------------------------------------------------------
+script rule starting on line 250 = 
+-----------------------------------------------------------------------
+dependencies for script satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+             r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+badr2_1 = 
+-----------------------------------------------------------------------
+dependencies for rule badr2_1 satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+             r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+badr2_2 = 
+-----------------------------------------------------------------------
+dependencies for rule badr2_2 satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+             r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+badr2_3 = 
+-----------------------------------------------------------------------
+dependencies for rule badr2_3 satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+             r1.E --> &node->mutex]
+binding relevant in = [r1.E --> &node->mutex]
+-----------------------------------------------------------------------
+r4 = 
+-----------------------------------------------------------------------
+dependencies for rule r4 satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+             r1.E --> &node->mutex]
+binding relevant in = [badr2_1.p --> poss[];badr2_2.p --> poss[];
+                      badr2_3.p --> poss[];
+                      cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                      cond_2.up --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))];
+                      r1.E --> &node->mutex]
+     transformation info is empty
+     binding out = []
+     binding out = [r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+-----------------------------------------------------------------------
+r7 = 
+-----------------------------------------------------------------------
+dependencies for rule r7 satisfied:
+binding in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+             r1.E --> &node->mutex;
+             r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+binding relevant in = [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                      r1.E --> &node->mutex;
+                      r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+     transformation info returned:
+          transform state: 12
+               with rule_elem: -mutex_lock@lp 
+                                 >>> scoped_guard(E) {
+                               -(-E-)-;
+               with binding: [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                             r1.E --> &node->mutex;
+                             r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+          transform state: 20
+               with rule_elem: -mutex_unlock@p 
+                                 >>> }
+                               -(-E-)-;
+               with binding: [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                             r1.E --> &node->mutex;
+                             r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+          transform state: 26
+               with rule_elem: -mutex_unlock@p 
+                                 >>> }
+                               -(-E-)-;
+               with binding: [cond_2.lp --> poss[(test_2.c,foo,((1,0),(11,1)),(3,0),(3,10))];
+                             r1.E --> &node->mutex;
+                             r4.p --> poss[(test_2.c,foo,((1,0),(11,1)),(6,24),(6,36)), (test_2.c,foo,((1,0),(11,1)),(9,0),(9,12))]]
+     binding out = []
+     transform one node: 26
+     transform one node: 20
+     transform one node: 12
+parse error 
+ = error in /tmp/cocci_small_output-3430962-056b79-test_2.c; set verbose_parsing for more info
+badcount: 0
+bad: }
+-----------------------------------------------------------------------
+Finished
+-----------------------------------------------------------------------
+parse error 
+ = error in /tmp/cocci-output-3430962-43e9cf-test_2.c; set verbose_parsing for more info
+badcount: 1
+bad: }
+BAD:!!!!! }
+diff = 
+--- test_2.c
++++ /tmp/cocci-output-3430962-43e9cf-test_2.c
+@@ -1,11 +1,11 @@
+ void foo() {
+ while(1){	
+-mutex_lock(&node->mutex);
+-                item = __btrfs_first_delayed_deletion_item(node);
++scoped_guard (&node->mutex) {
++                        item = __btrfs_first_delayed_deletion_item(node);
+                 if (!item) {
+-                        mutex_unlock(&node->mutex);
++                        }
+                         break;
+                 }
+-mutex_unlock(&node->mutex);
++}
+ }
+ }
+Check duplication for 1 files
+Finalizing python
+

@@ -1,6 +1,69 @@
 //safe handling scoped_guard transformation.
 //replace calls to mutex_lock and mutex_unlock
 //with scoped_guard.
+@r exists@
+expression E;
+iterator I;
+position p;
+@@
+(
+I(...){
+  <...
+  mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+    {
+       ...
+       mutex_unlock(E);
+       ... when any
+       break;
+    }
+|
+
+break;
+)
+   ...>
+}
+
+ 
+|
+for(...; ...; ...){
+   <...
+   mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+     {
+       ...
+       mutex_unlock(E);
+       ... when any
+       break;
+     }
+|
+break;
+)
+   ...>
+}
+|
+while(...) {
+ <...
+ mutex_lock@p(E);
+ ... when != mutex_unlock(E);
+     when any
+(
+    {
+     ...
+     mutex_unlock(E);
+     ... when any
+     break;
+    }
+|
+break;
+)
+ ...>
+}
+)
 
 @r1@
 expression E;
@@ -46,7 +109,8 @@ s@p
 
 @cond@
 expression r1.E;
-position lp != badr4.p2, up;
+position lp != {r.p ,badr4.p2};
+position up;
 @@
 mutex_lock@lp(E);
 ... when strict
@@ -58,8 +122,8 @@ lp << cond.lp;
 
 @@
 
-for i in range(len(lp)):
-    if int(lp[i].line) > int(up[0].line):
+for i in range(len(up)):
+    if int(lp[0].line) > int(up[i].line):
         cocci.include_match(False)
         break
 
@@ -96,6 +160,13 @@ position cond.lp, cond.up;
 mutex_lock@lp(E);
  ...
 mutex_unlock@up@p(E);
+
+@script:python@
+p << r2.p;
+lp << cond.lp;
+@@
+if len(p) > 1:
+   cocci.include_match(False)
 
 @badr5 exists@
 identifier label;
@@ -138,8 +209,7 @@ position r2.p, cond.lp, r5.s_g;
 -  }
 |
  if(...) { ... 
--  mutex_unlock(E); 
-   ... 
+-  mutex_unlock(E);
    return ...; }
 )
  ...>
@@ -160,8 +230,7 @@ return ...;
 -  }
 |
  if(...) { ... 
--  mutex_unlock(E); 
-   ... 
+-  mutex_unlock(E);
    return ...; }
 )
  ...>
@@ -172,7 +241,8 @@ return ...;
 //----------------------------------
 @cond_2@
 expression r1.E;
-position lp != badr4.p2, up; 
+position lp != {r.p, badr4.p2};
+position up;
 @@
 mutex_lock@lp(E);
 ... when strict
@@ -184,14 +254,37 @@ lp << cond_2.lp;
 
 @@
 
-for i in range(len(lp)):
-    if int(lp[i].line) > int(up[0].line):
+for i in range(len(up)):
+    if int(lp[0].line) > int(up[i].line):
         cocci.include_match(False)
         break
 
+@badr2_1@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... return ...; }
+
+@badr2_2@
+expression r1.E;
+position p;
+
+@@
+if(...) { ...mutex_unlock@p(E); ...  continue; }
+
+@badr2_3@
+expression r1.E;
+position p;
+identifier label;
+
+@@
+if(...) { ...mutex_unlock@p(E); ... goto label; }
+
+
 @r4@
 expression r1.E;
-position p != {badr1.p, badr2.p, badr3.p};
+position p != {badr2_1.p, badr2_2.p, badr2_3.p};
 position cond_2.lp, cond_2.up;
 
 @@

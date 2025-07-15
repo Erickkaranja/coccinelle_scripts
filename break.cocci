@@ -1,52 +1,69 @@
-@r@
+@r exists@
 expression E;
 iterator I;
-position p;
-@@
-I(...){
-  ...
-  mutex_lock@p(E);
-  ... when exists 
-         break;
-    }
- 
-@r1@
-expression E;
-position p;
-
-@@
-for(...; ...; ...){
-   ...
-   mutex_lock@p(E);
-   ... when exists
-       break;
-     }
-@r2@
-expression E;
-position p;
-
-@@
-while(...) {
- ...
- mutex_lock@p(E);
- ... when exists
-     break;
-}
-
-
-@r3 depends on r || r1 || r2@
-expression E;
 position p, p1;
 @@
+(
+I(...){
+  <...
+  mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+    {
+       ...
+       mutex_unlock@p1(E);
+       ... when any
+       break;
+    }
+|
 
-mutex_lock(E);
-... 
- break@p;
-...
-mutex_unlock@p1(E);
+break@p1;
+)
+   ...>
+}
+
+ 
+|
+for(...; ...; ...){
+   <...
+   mutex_lock@p(E);
+   ... when != mutex_unlock(E);
+       when any
+(
+     {
+       ...
+       mutex_unlock@p1(E);
+       ... when any
+       break;
+     }
+|
+break@p1;
+)
+   ...>
+}
+|
+while(...) {
+ <...
+ mutex_lock@p(E);
+ ... when != mutex_unlock(E);
+     when any
+(
+    {
+     ...
+     mutex_unlock@p1(E);
+     ... when any
+     break;
+    }
+|
+break@p1;
+)
+ ...>
+}
+)
 
 @script:python@
-p << r3.p;
-p1 << r3.p;
+p << r.p;
+p1 << r.p1;
 @@
-print(f'{p[0].line} -- {[item.line for item in p1 ]} -- {p[0].file}')
+print(f'{p[0].line} --- {p1[0].line} {p[0].file}')

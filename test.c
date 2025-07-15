@@ -1,30 +1,25 @@
-//case 1
-void foo(void)
+int ceph_monc_wait_osdmap(struct ceph_mon_client *monc, u32 epoch,
+                          unsigned long timeout)
 {
-        mutex_lock(&register_mutex);
+        unsigned long started = jiffies;
+        long ret; 
 
-        for (i = 0; i < SNDRV_CARDS; i++)
-                if (enable[i])
-                        break;
+        mutex_lock(&monc->mutex);
+        while (monc->subs[CEPH_SUB_OSDMAP].have < epoch) {
+                mutex_unlock(&monc->mutex);
 
-        if (i >= SNDRV_CARDS) {
-                dev_err(&device->dev, "no available " CARD_NAME " audio device\n");
-                ret = -ENODEV;
-        }
-        mutex_unlock(&register_mutex);
-}
+                if (timeout && time_after_eq(jiffies, started + timeout))
+                        return -ETIMEDOUT;
 
-//case 2
-void foo_2(void)
-{
-	mutex_lock(&devices_mutex);
-        for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
-                if (!test_bit(card_index, devices_used) && enable[card_index])
-                        break;
+                ret = wait_event_interruptible_timeout(monc->client->auth_wq,
+                                     monc->subs[CEPH_SUB_OSDMAP].have >= epoch,
+                                     ceph_timeout_jiffies(timeout));
+                if (ret < 0) 
+                        return ret; 
+
+                mutex_lock(&monc->mutex);
         }
-        if (card_index >= SNDRV_CARDS) {
-                mutex_unlock(&devices_mutex);
-                return -ENOENT;
-        }
-	mutex_unlock(&devices_mutex);
+
+        mutex_unlock(&monc->mutex);
+        return 0;
 }
