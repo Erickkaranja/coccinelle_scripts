@@ -1,8 +1,9 @@
 @r exists@
 expression E;
+identifier label;
 @@
 
-* scoped_guard(...) {
-  ... break;
+* mutex_lock(E);
+  ... goto label;
   ...
-}
+mutex_unlock(E);

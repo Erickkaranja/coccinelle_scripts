@@ -1,27 +1,34 @@
-@cond@
+//@r@
+//expression E;
+//position p;
+//@@
+//mutex_lock@p(E);
+//...
+//mutex_unlock(E);
+//... when strict
+//mutex_lock(E);
+
+@find_mutex_pattern@
 expression E;
-position lp;
-position up; 
+position p;
 @@
-mutex_lock@lp(E);
-... when strict
-mutex_unlock@up(E);
+mutex_lock@p(E);
+... when exists
+    mutex_unlock(E);
+...
+mutex_lock(E);
 
 @script:python@
-up << cond.up;
-lp << cond.lp;
+p << find_mutex_pattern.p;
 
 @@
+if p:
+   cocci.include_match(False);
 
-for i in range(len(up)):
-    if int(lp[0].line) > int(up[i].line):
-        cocci.include_match(False)
-        break
-
-@@
+@r@
 expression E;
-position cond.lp, cond.up;
+position p;
 @@
-mutex_lock@lp(E);
+mutex_lock@p(E);
 ...
-- mutex_unlock@up(E);
+-mutex_unlock(E);

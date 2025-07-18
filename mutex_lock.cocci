@@ -1,6 +1,27 @@
 //safe handling scoped_guard transformation.
 //replace calls to mutex_lock and mutex_unlock
 //with scoped_guard.
+@@
+expression E;
+@@
+func(...){
+... when any
+?- mutex_unlock(E);
++mutex_unlock(E, end);
+}
+
+@@
+expression E;
+constant C;
+identifier I;
+@@
+func(...){
+... when any
+?- mutex_unlock(E);
++mutex_unlock(E, end);
+return \(C\|I\);
+}
+ 
 @r exists@
 expression E;
 iterator I;
@@ -45,7 +66,9 @@ break;
 )
    ...>
 }
+
 |
+
 while(...) {
  <...
  mutex_lock@p(E);
@@ -66,10 +89,46 @@ break;
 )
 
 @r1@
-expression E;
+expression E, E2;
 @@
+(
 mutex_lock(E);
+... when != mutex_unlock(E);
+mutex_lock(E2);
+|
+mutex_lock(E);
+)
 
+@@
+expression r1.E, r1.E2;
+identifier f;
+@@
+f(...) {
+ ... when any
+-mutex_lock(E);
+... when != mutex_unlock(E);
+-mutex_lock(E2);
++guard(mutex)(E);
++guard(mutex)(E2);
+<...
+(
+ if(...)
+-  {
+-  mutex_unlock(E2);
+-  mutex_unlock(E); 
+   return ...; 
+-  }
+|
+ if(...) { ... 
+-  mutex_unlock(E2);
+-  mutex_unlock(E);
+   return ...; }
+)
+ ...>
+-mutex_unlock(E2);
+-mutex_unlock(E);
+return ...;
+}
 @@
 expression r1.E, E1;
 @@
@@ -127,32 +186,61 @@ for i in range(len(up)):
         cocci.include_match(False)
         break
 
+@find_mutex_pattern@
+expression E;
+position p;
+@@
+mutex_lock@p(E);
+... when exists
+    mutex_unlock(E);
+...
+mutex_lock(E);
+
+@script:python@
+p << find_mutex_pattern.p;
+
+@@
+if p:
+   cocci.include_match(False)
+
 //------------------------------------
-@badr1@
+@badr@
 expression r1.E;
 position p;
 
 @@
 if(...) { ...mutex_unlock@p(E); ... return ...; }
 
-@badr2@
+@badr1@
 expression r1.E;
 position p;
 
 @@
-if(...) { ...mutex_unlock@p(E); ...  continue; }
+if(...) { ...mutex_unlock@p(E); continue; }
 
-@badr3@
+@badr2@
 expression r1.E;
 position p;
 identifier label;
 
 @@
-if(...) { ...mutex_unlock@p(E); ... goto label; }
+if(...) { ...mutex_unlock@p(E);goto label; }
+
+@badr3@
+expression r1.E;
+position p;
+@@
+switch(...) {
+  case ...: {...}
+  default:
+  ...
+  mutex_unlock@p(E);
+  return ...;
+}
 
 @r2@
 expression r1.E;
-position p != {badr1.p, badr2.p, badr3.p};
+position p != {badr.p, badr1.p, badr2.p, badr3.p};
 position cond.lp, cond.up;
 
 @@
@@ -160,13 +248,6 @@ position cond.lp, cond.up;
 mutex_lock@lp(E);
  ...
 mutex_unlock@up@p(E);
-
-@script:python@
-p << r2.p;
-lp << cond.lp;
-@@
-if len(p) > 1:
-   cocci.include_match(False)
 
 @badr5 exists@
 identifier label;
@@ -188,14 +269,14 @@ position s_g != badr4.p2;
 @@
 mutex_lock@s_g@lp(E);
   ...
-   mutex_unlock@p(E);
-  return ...;
+mutex_unlock@p(E);
+return ...;
 
 
 @r3@
 expression r1.E;
 position r2.p, cond.lp, r5.s_g;
-
+identifier label;
 @@
 (
 - mutex_lock@s_g(E);
@@ -211,6 +292,11 @@ position r2.p, cond.lp, r5.s_g;
  if(...) { ... 
 -  mutex_unlock(E);
    return ...; }
+|
+goto label;
+...
+label:
+- mutex_unlock(E);
 )
  ...>
 -mutex_unlock@p(E);
@@ -232,122 +318,16 @@ return ...;
  if(...) { ... 
 -  mutex_unlock(E);
    return ...; }
+|
+switch(...) {
+  case ...: {...}
+  default:
+    ...
+-    mutex_unlock(E);
+    return ...;
+}
 )
  ...>
 -mutex_unlock@p(E);
 return ...;
 )
-
-//----------------------------------
-@cond_2@
-expression r1.E;
-position lp != {r.p, badr4.p2};
-position up;
-@@
-mutex_lock@lp(E);
-... when strict
-mutex_unlock@up(E);
-
-@script:python@
-up << cond_2.up;
-lp << cond_2.lp;
-
-@@
-
-for i in range(len(up)):
-    if int(lp[0].line) > int(up[i].line):
-        cocci.include_match(False)
-        break
-
-@badr2_1@
-expression r1.E;
-position p;
-
-@@
-if(...) { ...mutex_unlock@p(E); ... return ...; }
-
-@badr2_2@
-expression r1.E;
-position p;
-
-@@
-if(...) { ...mutex_unlock@p(E); ...  continue; }
-
-@badr2_3@
-expression r1.E;
-position p;
-identifier label;
-
-@@
-if(...) { ...mutex_unlock@p(E); ... goto label; }
-
-
-@r4@
-expression r1.E;
-position p != {badr2_1.p, badr2_2.p, badr2_3.p};
-position cond_2.lp, cond_2.up;
-
-@@
-
-mutex_lock@lp(E);
- ... 
-mutex_unlock@up@p(E);
-
-@r7@
-expression r1.E;
-position r4.p, cond_2.lp;
-identifier label;
-
-@@
-+scoped_guard(E) {
--mutex_lock@lp(E);
-<...
-(
-   if(...)
--   {   
--    mutex_unlock(E); 
-     return ...; 
--  }
-
-|
-
-   if(...) { ... 
--    mutex_unlock(E); 
-     return ...; 
-  }
-
-|
-
-   if(...)
--   {   
--    mutex_unlock(E);
-     continue;
--   }
-
-|
-  if(...)
-    {
-     ...
--    mutex_unlock(E);
-     continue;
-    }
-
-|
-
-  if(...)
--   {
--    mutex_unlock(E);
-     goto label;
--   }
-|
-
-  if(...)
-    {
-     ...
--    mutex_unlock(E);
-     goto label;
-    }
-)   
-  ...>
--mutex_unlock@p(E);
-+}
