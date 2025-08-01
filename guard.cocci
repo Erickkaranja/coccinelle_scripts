@@ -1,6 +1,7 @@
 //safe handling scoped_guard transformation.
 //replace calls to mutex_lock and mutex_unlock
 //with scoped_guard.
+
 /*
 @@
 expression E;
@@ -27,7 +28,11 @@ func(...){
 return \(C\|I\);
 }
  */
-@r exists@
+
+//bad break positions which on replacing with
+//guard alters the break inteded use.
+
+@bad_break exists@
 expression E;
 iterator I;
 position p;
@@ -56,6 +61,7 @@ break;
 
  
 |
+
 for(...; ...; ...){
    <...
    lock@p(E, ...);
@@ -69,6 +75,7 @@ for(...; ...; ...){
        break;
      }
 |
+
 break;
 )
    ...>
@@ -95,7 +102,9 @@ break;
 }
 )
 
-@r1@
+// Identify initial lock, may be a single lock
+//or a double lock.
+@r@
 expression E, E2;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -108,8 +117,10 @@ lock(E2, ...);
 lock(E, ...);
 )
 
-@@
-expression r1.E, r1.E2;
+//Handle sequential double locks of the same kind.
+
+@r1@
+expression r.E, r.E2;
 identifier f;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -118,9 +129,9 @@ identifier virtual.lock_type;
 f(...) {
  ... when any
 -lock(E, ...);
++guard(lock_type)(E);
 ... when != unlock(E);
 -lock(E2);
-+guard(lock_type)(E);
 +guard(lock_type)(E2);
 <...
 (
@@ -142,8 +153,10 @@ f(...) {
 return ...;
 }
 
-@@
-expression r1.E, E1;
+// Handle a single Expression between lock and unlock.
+
+@r2@
+expression r.E, E1;
 identifier virtual.lock_type;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -152,6 +165,9 @@ identifier virtual.unlock;
 +scoped_guard(lock_type, E)
 E1;
 -unlock(E, ...);
+
+//Identify nodes with goto label between
+//lock and unlock suitable for transformation.
 
 @goto_unlock exists@
 expression E;
@@ -173,7 +189,7 @@ label:
     s@p
 )
 
-@badr4 exists@
+@bad_goto exists@
 expression E;
 position goto_unlock.p;
 position goto_unlock.p1;
@@ -185,9 +201,11 @@ lock@p1@p2(E, ...);
 ...
 s@p
 
-@cond@
-expression r1.E;
-position lp != {r.p ,badr4.p2};
+//Exclude nodes with reverse lock order
+
+@lock_order@
+expression r.E;
+position lp != {bad_break.p ,bad_goto.p2};
 position up;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -197,8 +215,8 @@ lock@lp(E, ...);
 unlock@up(E, ...);
 
 @script:python@
-up << cond.up;
-lp << cond.lp;
+up << lock_order.up;
+lp << lock_order.lp;
 
 @@
 
@@ -207,7 +225,7 @@ for i in range(len(up)):
         cocci.include_match(False)
         break
 
-@find_mutex_pattern@
+@lock_order_2@
 expression E;
 position p;
 identifier virtual.lock;
@@ -220,40 +238,42 @@ lock@p(E, ...);
 lock(E, ...);
 
 @script:python@
-p << find_mutex_pattern.p;
+p << lock_order_2.p;
 
 @@
 if p:
    cocci.include_match(False)
 
 //------------------------------------
-@badr@
-expression r1.E;
-position p, cond.up;
+//Locate early unlocks
+
+@early_unlock@
+expression r.E;
+position p, lock_order.up;
 identifier virtual.unlock;
 
 @@
 if(...) { ...unlock@up@p(E, ...); ... return ...; }
 
-@badr1@
-expression r1.E;
-position p, cond.up;
+@early_unlock_2@
+expression r.E;
+position p, lock_order.up;
 identifier virtual.unlock;
 
 @@
 if(...) { ...unlock@up@p(E, ...); continue; }
 
-@badr2@
-expression r1.E;
-position p, cond.up;
+@early_unlock_3@
+expression r.E;
+position p, lock_order.up;
 identifier label;
 identifier virtual.unlock;
 @@
 if(...) { ...unlock@up@p(E, ...);goto label; }
 
-@badr3@
-expression r1.E;
-position p, cond.up;
+@early_unlock_4@
+expression r.E;
+position p, lock_order.up;
 identifier virtual.unlock;
 
 @@
@@ -265,10 +285,10 @@ switch(...) {
   return ...;
 }
 
-@r2@
-expression r1.E;
-position p != {badr.p, badr1.p, badr2.p, badr3.p};
-position cond.lp, cond.up;
+@r3@
+expression r.E;
+position p != {early_unlock.p, early_unlock_2.p, early_unlock_3.p, early_unlock_4.p};
+position lock_order.lp, lock_order.up;
 identifier virtual.lock;
 identifier virtual.unlock;
 @@
@@ -279,8 +299,8 @@ unlock@up@p(E, ...);
 
 @badr5 exists@
 identifier label;
-expression r1.E;
-position cond.lp;
+expression r.E;
+position lock_order.lp;
 identifier virtual.lock;
 identifier virtual.unlock;
 @@
@@ -292,9 +312,9 @@ if (...) {
   }
 
 @r5 depends on badr5@
-position cond.lp, r2.p;
-expression r1.E;
-position s_g != badr4.p2;
+position lock_order.lp, r3.p;
+expression r.E;
+position s_g != bad_goto.p2;
 identifier virtual.lock;
 identifier virtual.unlock;
 @@
@@ -304,9 +324,9 @@ unlock@p(E, ...);
 return ...;
 
 
-@r3@
-expression r1.E;
-position r2.p, cond.lp, r5.s_g;
+@r4@
+expression r.E;
+position r3.p, lock_order.lp, r5.s_g;
 identifier virtual.lock;
 identifier virtual.unlock;
 identifier virtual.lock_type;
