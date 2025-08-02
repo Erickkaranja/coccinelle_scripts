@@ -1,5 +1,16 @@
 @@
-expression E, E2;
+identifier lbl;
+expression E, E1;
 @@
-*mutex_lock(E);
-*mutex_lock(E2);
+-mutex_lock(E1);
++guard(mutex)(E1);
+<... when != mutex_unlock(E1);
+if(...) {
+...
+-goto lbl;
++ return E;
+}
+...>
+-lbl:
+- mutex_unlock(E1);
+  return E;
