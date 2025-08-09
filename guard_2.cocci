@@ -1,6 +1,5 @@
-#include "guard.cocci"
 
-@sg@
+@sg_initial_lock@
 expression E;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -8,42 +7,13 @@ identifier virtual.unlock;
 @@
 lock(E, ...);
 
-@goto_unlock_2 exists@
-expression E;
-identifier label;
-position p;
-position p1;
-statement s;
-identifier virtual.lock;
-identifier virtual.unlock;
-@@
-lock@p1(E, ...);
-... when != unlock(E, ...);
-    goto label;
-...
-label:
-(
-    unlock(E, ...);
-|
-    s@p
-)
+/*Ensure a strict lock and unlock order
+  lock should always come before the unlock
+*/
 
-@badr4_2 exists@
-expression E;
-position goto_unlock_2.p;
-position goto_unlock_2.p1;
-position p2;
-statement s;
-identifier virtual.lock;
-identifier virtual.unlock;
-@@
-lock@p1@p2(E, ...);
-...
-s@p
-
-@cond_2@
-expression sg.E;
-position lp != badr4_2.p2, up;
+@lock_unlock_order@
+expression sg_initial_lock.E;
+position lp, up;
 identifier virtual.lock;
 identifier virtual.unlock; 
 @@
@@ -52,8 +22,8 @@ lock@lp(E, ...);
 unlock@up(E, ...);
 
 @script:python@
-up << cond_2.up;
-lp << cond_2.lp;
+up << lock_unlock_order.up;
+lp << lock_unlock_order.lp;
 
 @@
 
@@ -62,7 +32,7 @@ for i in range(len(up)):
         cocci.include_match(False)
         break
 
-@find_mutex_pattern_2@
+@lock_unlock_order_2@
 expression E;
 position p;
 identifier virtual.lock;
@@ -75,14 +45,17 @@ lock@p(E, ...);
 lock(E, ...);
 
 @script:python@
-p << find_mutex_pattern_2.p;
+p << lock_unlock_order_2.p;
 
 @@
 if p:
    cocci.include_match(False)
 
-@badr_2@
-expression sg.E;
+//Identify early unlock which will help
+//isolate them from the last unlock
+
+@sg_early_unlock@
+expression sg_initial_lock.E;
 position p;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -90,8 +63,8 @@ identifier virtual.unlock;
 @@
 if(...) { ...unlock@p(E, ...); ... return ...; }
 
-@badr1_2@
-expression sg.E;
+@sg_early_unlock_2@
+expression sg_initial_lock.E;
 position p;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -99,8 +72,8 @@ identifier virtual.unlock;
 @@
 if(...) { ...unlock@p(E, ...); continue; }
 
-@badr2_2@
-expression sg.E;
+@sg_early_unlock_3@
+expression sg_initial_lock.E;
 position p;
 identifier label;
 identifier virtual.lock;
@@ -109,8 +82,8 @@ identifier virtual.unlock;
 @@
 if(...) { ...unlock@p(E, ...);  goto label; }
 
-@badr3_2@
-expression E;
+@sg_early_unlock_4@
+expression sg_initial_lock.E;
 position p;
 identifier virtual.lock;
 identifier virtual.unlock;
@@ -124,10 +97,16 @@ switch(...) {
   return ...;
 }
 
-@r4@
-expression sg.E;
-position p != {badr_2.p, badr1_2.p, badr2_2.p, badr3_2.p};
-position cond_2.lp, cond_2.up;
+/*
+  Identify the last unlock position which
+  should be different from the early_unlocks
+*/
+
+@sg_last_unlock@
+expression sg_initial_lock.E;
+position p != {sg_early_unlock.p, sg_early_unlock_2.p,
+               sg_early_unlock_3.p, sg_early_unlock_4.p};
+position lock_unlock_order.lp, lock_unlock_order.up;
 identifier virtual.lock;
 identifier virtual.unlock;
 
@@ -137,9 +116,14 @@ lock@lp(E, ...);
  ... 
 unlock@up@p(E, ...);
 
-@r7@
-expression sg.E;
-position r4.p, cond_2.lp;
+/*
+  Transform lock/unlock order to 
+  scoped_guard
+*/
+
+@s_g@
+expression sg_initial_lock.E;
+position sg_last_unlock.p, lock_unlock_order.lp;
 identifier label;
 identifier virtual.lock;
 identifier virtual.unlock;
